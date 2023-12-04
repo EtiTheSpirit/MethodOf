@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 namespace MethodOf {
 	public static class MethodOfProvider {
 
-		private static readonly ConditionalWeakTable<Delegate, MethodBase> _methods = new ConditionalWeakTable<Delegate, MethodBase>();
+		private static readonly ConditionalWeakTable<MethodInfo, MethodBase> _methods = new ConditionalWeakTable<MethodInfo, MethodBase>();
 		private static readonly Type[] _getMethodFromHandleParams = new Type[] { typeof(RuntimeMethodHandle) };
 		private static MethodInfo? _getMethodFromHandle = null;
 
@@ -19,10 +19,16 @@ namespace MethodOf {
 		/// <param name="del"></param>
 		/// <returns></returns>
 		public static MethodBase methodof<T>(T del) where T : Delegate {
-			if (_methods.TryGetValue(del, out MethodBase? method)) {
+			ArgumentNullException.ThrowIfNull(del);
+
+			MethodInfo original = del.GetMethodInfo();
+			if (original is null) throw new ArgumentException("The provided delegate's method was null!");
+
+			if (_methods.TryGetValue(original, out MethodBase? method)) {
 				return method;
 			}
-			DynamicMethod dynamicMethod = new DynamicMethod("GetSelf", typeof(MethodBase), Array.Empty<Type>());
+
+			DynamicMethod dynamicMethod = new DynamicMethod($"<{original}>methodof", typeof(MethodBase), Array.Empty<Type>());
 			ILGenerator generator = dynamicMethod.GetILGenerator();
 			// TARGET IL:
 			/*
@@ -31,12 +37,12 @@ namespace MethodOf {
 			* ret
 			*/
 			_getMethodFromHandle ??= typeof(MethodBase).GetMethod(nameof(MethodBase.GetMethodFromHandle), BindingFlags.Static | BindingFlags.Public, null, _getMethodFromHandleParams, null);
-			generator.Emit(OpCodes.Ldtoken, del.GetMethodInfo());
+			generator.Emit(OpCodes.Ldtoken, original);
 			generator.Emit(OpCodes.Call, _getMethodFromHandle!);
 			generator.Emit(OpCodes.Ret);
 			Func<MethodBase> getter = (Func<MethodBase>)dynamicMethod.CreateDelegate(typeof(Func<MethodBase>));
 			MethodBase result = getter.Invoke();
-			_methods.Add(del, result);
+			_methods.Add(original, result);
 			return result;
 		}
 	}
