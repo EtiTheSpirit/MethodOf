@@ -7,12 +7,6 @@ namespace MethodOfTest {
 		static void Main(string[] args) {
 			MethodBase mtd = methodof(DoVeryCoolThing);
 			Console.WriteLine(mtd.ToString());
-
-			// Test the cache.
-			mtd = methodof(DoVeryCoolThing);
-
-			methodof((int t) => false);
-
 			Console.ReadKey();
 		}
 
